@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tracking History</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            padding: 20px;
+            background-color: #f4f4f4;
+            border-radius: 8px;
+            max-width: 600px;
+            margin: auto;
+        }
+        input[type="text"], textarea {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background-color: #28a745;
+            color: white;
+            cursor: pointer;
+        }
+        button.disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .history-entry {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 5px 0;
+            background-color: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Tracking History</h1>
+
+    <input type="text" id="userName" placeholder="Enter your name" />
+    <button id="startButton">Start</button>
+    <button id="stopButton" class="disabled" disabled>Stop</button>
+    <button id="copyData" class="disabled" disabled>Copy Data</button>
+    <button id="downloadData" class="disabled" disabled>Download History</button>
+
+    <h3>Session Status</h3>
+    <p id="nameDisplay">Name: <span class="highlight">N/A</span></p>
+    <p id="startTimeDisplay">Start Time: <span class="highlight">N/A</span></p>
+    <p id="stopTimeDisplay">Stop Time: <span class="highlight">N/A</span></p>
+    <p id="totalTimeDisplay">Total Time: <span class="highlight">N/A</span></p>
+    <p id="statusDisplay">Status: <span class="highlight">N/A</span></p>
+
+    <h3>Edit Tracking History</h3>
+    <textarea id="editHistory" placeholder="Edit your tracking history here..."></textarea>
+    <button id="saveEditedHistory" class="disabled" disabled>Save Edited History</button>
+
+    <h3>All Tracking History</h3>
+    <div id="allHistoryContainer"></div>
+    
+    <script>
+        let startTime, endTime, totalMinutes;
+        let isTracking = false;
+        const allHistoryContainer = document.getElementById('allHistoryContainer');
+
+        function formatTime(date) {
+            return date ? date.toLocaleString() : "N/A";
+        }
+
+        function updateButtonState(buttonId, enable) {
+            const button = document.getElementById(buttonId);
+            button.disabled = !enable;
+            button.classList.toggle('disabled', !enable);
+        }
+
+        function updateDisplay(id, content) {
+            document.getElementById(id).innerHTML = content;
+        }
+
+        function appendHistoryEntry(sessionData) {
+            const entryDiv = document.createElement('div');
+            entryDiv.className = 'history-entry';
+            entryDiv.textContent = sessionData;
+            allHistoryContainer.appendChild(entryDiv);
+            saveToLocalStorage(sessionData); // Save entry to local storage
+        }
+
+        function saveToLocalStorage(entry) {
+            const history = JSON.parse(localStorage.getItem('trackingHistory')) || [];
+            // Prevent duplicate entries
+            if (!history.includes(entry)) {
+                history.push(entry);
+                localStorage.setItem('trackingHistory', JSON.stringify(history));
+            }
+        }
+
+        function loadHistoryFromLocalStorage() {
+            const history = JSON.parse(localStorage.getItem('trackingHistory')) || [];
+            history.forEach(entry => {
+                const entryDiv = document.createElement('div');
+                entryDiv.className = 'history-entry';
+                entryDiv.textContent = entry;
+                allHistoryContainer.appendChild(entryDiv);
+            });
+        }
+
+        function downloadHistoryAsFile() {
+            const historyEntries = JSON.parse(localStorage.getItem('trackingHistory')) || [];
+            const blob = new Blob([historyEntries.join('\n\n')], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'tracking_history.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function saveEditedHistory() {
+            const editedHistory = document.getElementById('editHistory').value.trim();
+            if (!editedHistory) {
+                alert('No data to save. Please edit the history before saving.');
+                return;
+            }
+
+            // Update the history display and save to local storage
+            const history = JSON.parse(localStorage.getItem('trackingHistory')) || [];
+            const updatedHistory = history.map((entry, index) => 
+                index === history.length - 1 ? editedHistory : entry
+            );
+            localStorage.setItem('trackingHistory', JSON.stringify(updatedHistory));
+            allHistoryContainer.innerHTML = ''; // Clear the display
+            loadHistoryFromLocalStorage(); // Reload the updated history
+            alert('Edited history saved!');
+        }
+
+        document.getElementById('startButton').addEventListener('click', function() {
+            const userNameInput = document.getElementById('userName').value.trim();
+            if (!userNameInput) {
+                alert('Please enter your name before starting the timer.');
+                return;
+            }
+
+            if (isTracking) {
+                alert("Tracking is already in progress. Please stop the current session before starting a new one.");
+                return;
+            }
+
+            startTime = new Date();
+            isTracking = true;
+
+            updateDisplay('nameDisplay', `Name: <span class="highlight">${userNameInput}</span>`);
+            updateDisplay('startTimeDisplay', `Start Time: <span class="highlight">${formatTime(startTime)}</span>`);
+            updateDisplay('statusDisplay', `Status: <span class="highlight">Tracking</span>`);
+
+            updateButtonState('startButton', false);
+            updateButtonState('stopButton', true);
+        });
+
+        document.getElementById('stopButton').addEventListener('click', function() {
+            if (!isTracking) {
+                alert("Tracking hasn't started yet. Please start the tracking session first.");
+                return;
+            }
+
+            endTime = new Date();
+            totalMinutes = Math.round((endTime - startTime) / 60000);
+            isTracking = false;
+
+            const userNameInput = document.getElementById('userName').value.trim();
+
+            updateDisplay('stopTimeDisplay', `Stop Time: <span class="highlight">${formatTime(endTime)}</span>`);
+            updateDisplay('totalTimeDisplay', `Total Time: <span class="highlight">${totalMinutes} minutes</span>`);
+            updateDisplay('statusDisplay', `Status: <span class="highlight">Stopped</span>`);
+
+            const sessionData = `
+Name: ${userNameInput}
+Start Time: ${formatTime(startTime)}
+Stop Time: ${formatTime(endTime)}
+Total Time: ${totalMinutes} minutes
+-----------------------------------`;
+
+            appendHistoryEntry(sessionData.trim());
+
+            alert('Session history saved!');
+
+            updateButtonState('startButton', true);
+            updateButtonState('stopButton', false);
+            updateButtonState('copyData', true);
+            updateButtonState('downloadData', true);
+            updateButtonState('saveEditedHistory', true); // Enable Save Edited History
+        });
+
+        document.getElementById('copyData').addEventListener('click', function() {
+            const historyEntries = document.querySelectorAll('.history-entry');
+            let fullHistory = '';
+
+            historyEntries.forEach(entry => {
+                fullHistory += entry.textContent + '\n\n'; // Join all history entries
+            });
+
+            if (fullHistory) {
+                navigator.clipboard.writeText(fullHistory).then(() => {
+                    alert('All history copied to clipboard!');
+                }).catch(err => {
+                    alert('Failed to copy data: ', err);
+                });
+            } else {
+                alert('No history to copy.');
+            }
+        });
+
+        document.getElementById('downloadData').addEventListener('click', function() {
+            downloadHistoryAsFile();
+        });
+
+        document.getElementById('saveEditedHistory').addEventListener('click', saveEditedHistory);
+
+        // Load history from local storage on page load
+        window.onload = loadHistoryFromLocalStorage;
+
+    </script>
+</body>
+</html>
